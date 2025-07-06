@@ -5,6 +5,7 @@ description = "Interview Agent with Human-in-the-Loop"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.115.14",
     "langchain>=0.1.0",
     "langchain-core>=0.1.0",
     "langgraph>=0.0.40",

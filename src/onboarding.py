@@ -22,23 +22,9 @@ class InterviewState(TypedDict):
     current_question: str
     
 # AI Interviewer System Prompt
-INTERVIEWER_SYSTEM_PROMPT = """You are an experienced and professional AI interviewer. Your role is to conduct thorough, engaging interviews.
+from prompts import INTERVIEWER_PROMPT
 
-Guidelines:
-- Ask thoughtful, relevant questions that build upon previous responses
-- Maintain a professional yet friendly tone
-- Ask follow-up questions to dig deeper into interesting points
-- Vary question types: behavioral, technical, situational, and personal
-- Keep questions concise and clear
-- Adapt your questioning style based on the candidate's responses
-- After 5-7 questions, you may conclude the interview naturally
 
-Your goal is to understand the candidate's background, skills, motivations, and fit for the role.
-
-Current interview context: {context}
-Question count: {question_count}
-
-Based on the conversation so far, generate your next interview question. If you feel the interview is complete (after 5-7 substantial questions), respond with "INTERVIEW_COMPLETE" instead of a question."""
 
 def initialize_interview_node(state: InterviewState) -> InterviewState:
     """Initialize the interview with AI interviewer introduction"""
@@ -48,7 +34,7 @@ def initialize_interview_node(state: InterviewState) -> InterviewState:
     
     # Get AI introduction
     response = client.chat.completions.create(
-        model="gpt-4-turbo-preview",  # Using GPT-4 Turbo as GPT-4.1 isn't available yet
+        model="o3-mini",
         messages=[
             {"role": "system", "content": "You are a professional AI interviewer. Introduce yourself briefly and explain that you'll be conducting an interview. Ask for the candidate's name and preferred role they're interviewing for. Keep it warm and professional."},
             {"role": "user", "content": "Please introduce yourself and start the interview."}
@@ -90,7 +76,7 @@ def ai_generate_question_node(state: InterviewState) -> InterviewState:
     response = client.chat.completions.create(
         model="gpt-4-turbo-preview",  # Using GPT-4 Turbo as GPT-4.1 isn't available yet
         messages=[
-            {"role": "system", "content": INTERVIEWER_SYSTEM_PROMPT.format(
+            {"role": "system", "content": INTERVIEWER_PROMPT.format(
                 context=state["interview_context"], 
                 question_count=state["question_count"]
             )},
