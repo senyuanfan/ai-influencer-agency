@@ -1,7 +1,9 @@
 # AI Influencer Agency
+主要可以参考```src/prompt.py```里的prompt。
 
 ### Launch the Project
-1. 
+1. Launch mcp server using ```uv run uvicorn src/mcp:app --reload```
+2. Run agent using ```uv run src/onboarding.py``` and ```uv run src/planninng.py```
 
 ### Using UV To Setup the Project
 [Documentation](https://docs.astral.sh/uv/)

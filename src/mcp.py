@@ -20,16 +20,10 @@ print(pathlib.Path(INTERVIEW_FILE).resolve())
 text = pathlib.Path(INTERVIEW_FILE).resolve().read_text(encoding="utf-8")
 segments = [s.strip() for s in re.split(r"\n\s*\n", text) if s.strip()]  # :contentReference[oaicite:7]{index=7}
 
-@app.get("/split_segments")
-def split_segments():
-    return [f"resource://segment_{i}" for i in range(1, len(segments)+1)]
 
-@app.get("/resource/{segment_id}", response_class=PlainTextResponse)
-def get_resource(segment_id: str):
-    m = re.match(r"segment_(\d+)", segment_id)
-    if not m:
-        raise HTTPException(404, "Bad resource id")
-    idx = int(m.group(1)) - 1
-    if idx >= len(segments):
-        raise HTTPException(404, "Segment not found")
-    return segments[idx]
+@app.get("/resource/", response_class=PlainTextResponse)
+def get_resource():
+    """
+    Returns the interview results as a plain text response.
+    """
+    return text
