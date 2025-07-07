@@ -113,4 +113,6 @@ content: |
     "editing_notes": "交替慢动作与节奏切",
     "publish_meta": {"hashtags":["#减速生活","#高质Vlog"],"platform":"Douyin"}
   }
+
+  Make sure to write the output as a Markdown file.
 """

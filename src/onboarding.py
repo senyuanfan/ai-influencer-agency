@@ -25,11 +25,10 @@ class InterviewState(TypedDict):
 from prompts import INTERVIEWER_PROMPT
 
 
-
 def initialize_interview_node(state: InterviewState) -> InterviewState:
     """Initialize the interview with AI interviewer introduction"""
     print("\n" + "="*60)
-    print("🤖 AI INTERVIEWER POWERED BY GPT-4.1")
+    print("🤖 AI INTERVIEWER POWERED BY LLM")
     print("="*60)
     
     # Get AI introduction
@@ -72,9 +71,9 @@ def ai_generate_question_node(state: InterviewState) -> InterviewState:
         role = "Interviewer" if msg["role"] == "assistant" else "Candidate"
         conversation_history += f"{role}: {msg['content']}\n"
     
-    # Generate next question using GPT-4.1
+    # Generate next question using OpenAI models
     response = client.chat.completions.create(
-        model="gpt-4-turbo-preview",  # Using GPT-4 Turbo as GPT-4.1 isn't available yet
+        model="o3-mini",
         messages=[
             {"role": "system", "content": INTERVIEWER_PROMPT.format(
                 context=state["interview_context"], 
@@ -134,7 +133,7 @@ def ai_interview_summary_node(state: InterviewState) -> InterviewState:
     
     # Get AI summary
     summary_response = client.chat.completions.create(
-        model="gpt-4-turbo-preview",
+        model="o3-mini",
         messages=[
             {"role": "system", "content": """You are an AI interviewer providing a professional interview summary. 
 
@@ -248,7 +247,7 @@ async def run_ai_interview():
 
 def main():
     """Main function to start the AI interview"""
-    print("🚀 Starting AI-Powered Interview Agent with GPT-4.1...")
+    print("🚀 Starting AI-Powered Interview Agent with LLM")
     print("🔑 Make sure your OPENAI_API_KEY is set in your .env file!")
     
     try:

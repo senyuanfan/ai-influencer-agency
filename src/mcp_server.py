@@ -5,7 +5,9 @@ import os
 import requests
 from openai import OpenAI
 
-os.environ["MCP_FILE_ROOTS"] = "/DATA/senyuan/memo/resources"
+from dotenv import load_dotenv
+load_dotenv()
+
 # -----------------------------------------------------------------------------
 # FastMCP server instance
 # -----------------------------------------------------------------------------
@@ -20,8 +22,7 @@ mcp = FastMCP(
         "content filtering, and site navigation with customizable keywords.\n\n"
         "Set the environment variable MCP_FILE_ROOTS to one or more directory "
         "paths (comma‑separated) that the server is allowed to read."
-    ),
-    tags={"csv", "pandas", "data", "web browsing", "search", "duckduckgo", "markdown", "image generation", "content discovery"},
+    )
 )
 
 # -----------------------------------------------------------------------------
@@ -40,7 +41,7 @@ def _resolve_path(filename: str) -> pathlib.Path:
     Raises:
         NotADirectoryError: If the resolved root path is not a directory.
     """
-    mcp_roots_str = os.getenv("MCP_FILE_ROOTS", "/DATA/senyuan/memo/resources")
+    mcp_roots_str = os.getenv("MCP_FILE_ROOTS", "data")
     print(f"MCP_FILE_ROOTS: {mcp_roots_str}")
     # Use the first directory specified in MCP_FILE_ROOTS
     root_dir_str = mcp_roots_str.split(",")[0].strip()
@@ -60,8 +61,6 @@ def _load_df(path: str) -> pd.DataFrame:
     This function performs the following steps:
       - Resolves the absolute file path using `_resolve_path`.
       - Reads the CSV into a DataFrame.
-      - Parses the TWEET_TIME column into pandas datetime objects (coercing errors).
-      - Sorts the DataFrame chronologically based on TWEET_TIME (earliest to latest).
       - Resets the DataFrame index.
 
     Args:
@@ -71,8 +70,7 @@ def _load_df(path: str) -> pd.DataFrame:
         A pandas DataFrame with processed and sorted data.
     """
     df = pd.read_csv(_resolve_path(path))
-    df[TWEET_TIME] = pd.to_datetime(df[TWEET_TIME], errors="coerce")
-    df = df.sort_values(TWEET_TIME).reset_index(drop=True)
+
     return df
 
 
@@ -83,35 +81,6 @@ def _load_df(path: str) -> pd.DataFrame:
 import re
 from markdownify import markdownify
 from requests.exceptions import RequestException
-
-@mcp.tool()
-def visit_webpage(url: str) -> str:
-    """Visits a webpage at the given URL and returns its content as a markdown string.
-
-    Args:
-        url: The URL of the webpage to visit.
-
-    Returns:
-        The content of the webpage converted to Markdown, or an error message if the request fails.
-    """
-    try:
-        # Send a GET request to the URL
-        response = requests.get(url)
-        response.raise_for_status()  # Raise an exception for bad status codes
-
-        # Convert the HTML content to Markdown
-        markdown_content = markdownify(response.text).strip()
-
-        # Remove multiple line breaks
-        markdown_content = re.sub(r"\n{3,}", "\n\n", markdown_content)
-
-        return markdown_content
-
-    except RequestException as e:
-        return f"Error fetching the webpage: {str(e)}"
-    except Exception as e:
-        return f"An unexpected error occurred: {str(e)}"
-
 
 @mcp.tool()
 def search_web(query: str, num_results: int = 10, keywords: list[str] = None) -> str:
@@ -258,6 +227,35 @@ def extract_links(url: str, filter_keywords: list[str] = None, link_text_only: b
 
 
 @mcp.tool()
+def visit_webpage(base_url: str) -> str:
+    """Visits a webpage at the given URL and returns its content as a markdown string.
+
+    Args:
+        base_url: The base URL of the webpage to visit.
+
+    Returns:
+        The content of the webpage converted to Markdown, or an error message if the request fails.
+    """
+    try:
+        # Send a GET request to the URL
+        response = requests.get(base_url)
+        response.raise_for_status()  # Raise an exception for bad status codes
+
+        # Convert the HTML content to Markdown
+        markdown_content = markdownify(response.text).strip()
+
+        # Remove multiple line breaks
+        markdown_content = re.sub(r"\n{3,}", "\n\n", markdown_content)
+
+        return markdown_content
+
+    except RequestException as e:
+        return f"Error fetching the webpage: {str(e)}"
+    except Exception as e:
+        return f"An unexpected error occurred: {str(e)}"
+    
+
+@mcp.tool()
 def browse_site_for_content(base_url: str, keywords: list[str] = None, max_pages: int = 5) -> str:
     """Browse a website looking for pages containing specific keywords.
 
@@ -378,7 +376,7 @@ def get_files() -> list[str]:
     Example:
         get_files()
     """
-    path = os.getenv("MCP_FILE_ROOTS", "/DATA/senyuan/memo/resources")
+    path = os.getenv("MCP_FILE_ROOTS", "data")
     return [f.name for f in pathlib.Path(path).glob("**/*") if f.is_file()]
 
 @mcp.tool()
@@ -386,7 +384,7 @@ def load_csv(path: str) -> dict:
     """Return column names and row count of the CSV file at the specified path.
 
     Args:
-        path: The filename or relative path of the CSV file (e.g., 'tweets.csv').
+        path: The filename or relative path of the CSV file.
 
     Returns:
         A dictionary containing 'columns' (list of column names) and 'rows' (integer count).
@@ -466,243 +464,6 @@ def query(path: str, expr: str) -> str:
         return f"Error evaluating query: {exc}"
     return result.to_markdown()
 
-
-
-# ---------------------------------------------------------------------------
-# Column name constants (mapping to actual names in the CSV)
-# ---------------------------------------------------------------------------
-
-TWEET_TIME   = "发布时间"
-TWEET_TEXT   = "text"
-LIKE_COL     = "likes"
-RT_COL       = "转发数量"
-REPLY_COL    = "回复数量"
-FOLLOWER_COL = "用户粉丝数"
-TAG_COL      = "标签"
-VIDEO_COL    = "包含视频"
-IMAGE_COL    = "包含图片"
-
-
-@mcp.tool()
-def account_start(path: str, n: int = 25) -> str:
-    """Return the earliest *n* tweets from the account, showing time, text, likes, and retweets.
-
-    This helps understand the account's initial voice and engagement. The tweets are
-    sorted chronologically before selecting the first *n*.
-
-    Args:
-        path: The filename or relative path of the CSV file (e.g., 'tweets.csv').
-        n: The number of initial tweets to return (default is 25).
-
-    Returns:
-        A string containing the specified tweets formatted as Markdown.
-
-    Note: Always call this function using keyword arguments (e.g., `account_start(path=..., n=...)`).
-
-    Example:
-        account_start(path='tweets.csv', n=10)
-    """
-    df = _load_df(path).head(n)
-    cols = [TWEET_TIME, TWEET_TEXT, LIKE_COL, RT_COL]
-    return df[cols].to_markdown(index=False)
-
-
-@mcp.tool()
-def follower_growth(path: str, freq: str = "A") -> dict:
-    """Summarise the evolution of the follower count over time.
-
-    Calculates the starting, ending, and change in follower count for each time period defined by `freq`.
-
-    Args:
-        path: The filename or relative path of the CSV file (e.g., 'tweets.csv').
-        freq: The frequency for resampling time ('A' for annual, 'M' for monthly, etc.).
-              Refer to pandas documentation for frequency strings. Default is 'A'.
-
-    Returns:
-        A list of dictionaries, where each dictionary represents a time period and contains
-        'period', 'start' (follower count at start), 'end' (follower count at end), and 'delta' (change).
-
-    Note: Always call this function using keyword arguments (e.g., `follower_growth(path=..., freq=...)`).
-
-    Example:
-        follower_growth(path='tweets.csv', freq='M')
-    """
-    df = _load_df(path)[[TWEET_TIME, FOLLOWER_COL]]
-    snap = (
-        df.set_index(TWEET_TIME)
-          .resample(freq)[FOLLOWER_COL]
-          .agg(["first", "last"])
-          .rename(columns={"first": "start", "last": "end"})
-    )
-    snap["delta"] = snap["end"] - snap["start"]
-    return snap.reset_index().to_dict(orient="records")
-
-
-@mcp.tool()
-def engagement_timeline(
-    path: str,
-    freq: str = "M",
-    metrics: list[str] = [LIKE_COL, RT_COL, REPLY_COL],
-    agg: str = "mean",
-) -> dict:
-    """Aggregate specified engagement metrics over time periods.
-
-    Calculates an aggregate statistic (e.g., mean, sum) for selected engagement metrics
-    (likes, retweets, replies by default) for each time period defined by `freq`.
-
-    Args:
-        path: The filename or relative path of the CSV file (e.g., 'tweets.csv').
-        freq: The frequency for resampling time ('M' for monthly, 'A' for annual, etc.). Default is 'M'.
-        metrics: A list of column names representing the engagement metrics to aggregate.
-                 Defaults to likes, retweets, and replies.
-        agg: The aggregation function to apply ('mean', 'sum', 'median', etc.). Default is 'mean'.
-
-    Returns:
-        A list of dictionaries, where each dictionary represents a time period (formatted 'YYYY-MM'
-        for monthly freq) and contains the aggregated values for the specified metrics.
-
-    Note: Always call this function using keyword arguments.
-
-    Example:
-        engagement_timeline(path='tweets.csv', freq='Q', agg='sum', metrics=['likes'])
-    """
-    df = _load_df(path).set_index(TWEET_TIME)
-    grouped = df[metrics].resample(freq).agg(agg)
-    grouped.index = grouped.index.strftime("%Y-%m") # Assumes monthly, might need adjustment for other freqs
-    return grouped.reset_index().to_dict(orient="records")
-
-
-@mcp.tool()
-def hashtag_trend(
-    path: str,
-    freq: str = "A",
-    top_k: int = 5,
-    sep: str = r"[,\s;#]+",
-) -> dict:
-    """Identify the most frequent hashtags used within specified time periods.
-
-    Splits the tag column based on the separator regex, counts hashtag occurrences for each period,
-    and returns the top *k* hashtags for each period.
-
-    Args:
-        path: The filename or relative path of the CSV file (e.g., 'tweets.csv').
-        freq: The frequency for grouping time ('A' for annual, 'M' for monthly, etc.). Default is 'A'.
-        top_k: The number of top hashtags to return for each period (default is 5).
-        sep: A regular expression used to split the string in the tag column into individual hashtags.
-             Default is r'[,\s;#]+' (splits on commas, whitespace, semicolons, or hash symbols).
-
-    Returns:
-        A dictionary where keys are string representations of the time periods and values are lists
-        of dictionaries, each containing a 'tag' and its 'count'.
-
-    Note: Always call this function using keyword arguments.
-
-    Example:
-        hashtag_trend(path='tweets.csv', freq='M', top_k=3)
-    """
-    import re
-    from collections import Counter
-
-    df = _load_df(path)[[TWEET_TIME, TAG_COL]].dropna()
-    df["period"] = df[TWEET_TIME].dt.to_period(freq)
-    trend = {}
-
-    for period, sub in df.groupby("period"):
-        # Split tags, handle potential list/string issues, explode, count
-        tags = (
-            sub[TAG_COL]
-            .astype(str)
-            .apply(lambda s: [t for t in re.split(sep, s) if t]) # Ensure non-empty tags
-            .explode() # Convert list of tags per row into one tag per row
-        )
-        common = Counter(tags).most_common(top_k)
-        trend[str(period)] = [{"tag": t, "count": c} for t, c in common]
-
-    return trend
-
-
-@mcp.tool()
-def media_usage(path: str) -> dict:
-    """Compare engagement metrics for tweets containing images, videos, or neither.
-
-    Calculates the count, mean likes, and mean retweets for three categories:
-    tweets with images, tweets with videos, and plain text tweets (no image or video).
-
-    Args:
-        path: The filename or relative path of the CSV file (e.g., 'tweets.csv').
-
-    Returns:
-        A dictionary where keys are 'image', 'video', and 'plain', and values are
-        dictionaries containing 'count', 'mean_likes', and 'mean_rt'.
-
-    Note: Always call this function using keyword arguments (e.g., `media_usage(path=...)`).
-
-    Example:
-        media_usage(path='tweets.csv')
-    """
-    df = _load_df(path)
-    def stats(mask, label):
-        """Helper to calculate stats for a subset of the DataFrame."""
-        sub = df[mask]
-        # Handle potential division by zero if a category is empty
-        mean_likes = sub[LIKE_COL].mean() if not sub.empty else 0.0
-        mean_rt = sub[RT_COL].mean() if not sub.empty else 0.0
-        return {
-            "count": int(len(sub)),
-            "mean_likes": float(mean_likes),
-            "mean_rt": float(mean_rt),
-        }
-
-    return {
-        "image": stats(df[IMAGE_COL], "image"), # Assumes IMAGE_COL is boolean or 0/1
-        "video": stats(df[VIDEO_COL], "video"), # Assumes VIDEO_COL is boolean or 0/1
-        "plain": stats(~(df[IMAGE_COL] | df[VIDEO_COL]), "plain"),
-    }
-
-
-@mcp.tool()
-def milestone_tweets(
-    path: str,
-    metric: str = LIKE_COL,
-    threshold: int = 1000,
-    top_n: int = 3,
-) -> str:
-    """Identify the first tweet reaching an engagement threshold and the overall top tweets.
-
-    Finds the chronologically earliest tweet where the specified `metric` (e.g., likes)
-    meets or exceeds the `threshold`. Also returns the `top_n` tweets globally based on that metric.
-
-    Args:
-        path: The filename or relative path of the CSV file (e.g., 'tweets.csv').
-        metric: The engagement column name to use for thresholding and ranking (default is likes).
-        threshold: The minimum value for the metric to qualify as a milestone (default is 1000).
-        top_n: The number of top-performing tweets to return overall (default is 3).
-
-    Returns:
-        A string containing the milestone tweet and top tweets formatted as Markdown.
-
-    Note: Always call this function using keyword arguments.
-
-    Example:
-        milestone_tweets(path='tweets.csv', metric='转发数量', threshold=100, top_n=5)
-    """
-    df = _load_df(path)
-    cols = [TWEET_TIME, TWEET_TEXT, metric]
-
-    # Find the first tweet crossing the threshold
-    crossed = df[df[metric] >= threshold]
-    first = crossed.head(1)[cols] if not crossed.empty else pd.DataFrame(columns=cols)
-
-    # Find the global top N tweets based on the metric
-    top = df.nlargest(top_n, metric)[cols]
-
-    # Combine results into a formatted Markdown table
-    out = pd.concat(
-        [pd.DataFrame({"★ Milestone": [" "]*(len(first) > 0)}), first,
-         pd.DataFrame({"★ Top Tweets": [" "]*(len(top) > 0)}), top],
-        ignore_index=True
-    )
-    return out.to_markdown(index=False)
 
 # -----------------------------------------------------------------------------
 # Markdown File Tools
@@ -848,15 +609,5 @@ def generate_image(prompt: str, filename: str = None, size: str = "1024x1024") -
         return f"Error generating image: {str(e)}"
 
 
-# -----------------------------------------------------------------------------
-# Server Execution Instructions
-# -----------------------------------------------------------------------------
-# To run the server (SSE transport, port 4444):
-#
-#   export MCP_FILE_ROOTS=/path/to/your/csv/directory[,/another/allowed/path]
-#   fastmcp run /DATA/senyuan/memo/src/mcp_server.py:mcp --transport sse --port 4444
-#
-# The server will then be reachable at http://localhost:4444/sse
-# and can be consumed by MCP clients. Ensure the specified directories exist
-# and contain the necessary CSV files (e.g., 'tweets.csv').
-# Set MCP_FILE_ROOTS appropriately before running.
+if __name__ == "__main__":
+    mcp.run(transport="stdio")

@@ -5,12 +5,17 @@ description = "Interview Agent with Human-in-the-Loop"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "asyncio>=3.4.3",
+    "duckduckgo-search>=8.1.1",
     "fastapi>=0.115.14",
     "fastmcp>=2.10.2",
     "langchain>=0.1.0",
     "langchain-core>=0.1.0",
+    "langchain-mcp-adapters>=0.1.8",
+    "langchain-openai>=0.3.24",
     "langgraph>=0.0.40",
     "langgraph-cli[inmem]>=0.3.1",
+    "markdownify>=1.1.0",
     "numpy>=2.3.0",
     "openai>=1.0.0",
     "pandas>=2.3.0",
